@@ -18,7 +18,7 @@ import numpy as np
 import re
 
 #%% DEFINITIONS
-port = "COM7"   # modify this port name !!!
+port = "COM4"   # modify this port name !!!
 baudrate = 9600 # must be similar to the one in 'getAngle.ino'
 N = 200         # number of plotted measurements
 M = 2000        # number of total measurements before stop

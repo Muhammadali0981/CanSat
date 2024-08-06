@@ -3,6 +3,7 @@
 #include <Adafruit_BMP280.h>
 #include <TinyGPSPlus.h>
 #include <SoftwareSerial.h>
+#include <ArduinoJson.h>
 
 // MPU6050 and BMP280 objects
 MPU6050 mpu(Wire);
@@ -65,108 +66,84 @@ void loop() {
 
   // Update MPU6050 and BMP280 data every second
   if ((millis() - timer) > 1000) { // print data every 1000ms (1 second)
-    Serial.println("\n");
-    String dataToSend = "";
-    updateMPU6050(dataToSend);
-    updateBMP280(dataToSend);
-    displayGPSInfo(dataToSend);
-
-    // Send data via HC-12
-    sendDataViaHC12(dataToSend);
+    updateMPU6050();
+    updateBMP280();
+    displayGPSInfo();
 
     // Update timer
     timer = millis();
   }
 }
 
-void updateMPU6050(String &dataToSend) {
+void updateMPU6050() {
   mpu.update();
   
-  // Read and print MPU6050 data
+  // Read MPU6050 data
   float Yaw = mpu.getAngleZ();
   float Pitch = mpu.getAngleX();
   float Roll = mpu.getAngleY();
   
-  Serial.print("Yaw: ");
-  Serial.print(Yaw);
-  Serial.print("  Pitch: ");
-  Serial.print(Pitch);
-  Serial.print("  Roll: ");
-  Serial.println(Roll);
-  
-  // Append data to string for HC-12 transmission
-  dataToSend += "Yaw: " + String(Yaw) + " Pitch: " + String(Pitch) + " Roll: " + String(Roll) + " ";
+  // Create JSON object
+  StaticJsonDocument<256> doc;
+  doc["yaw"] = Yaw;
+  doc["pitch"] = Pitch;
+  doc["roll"] = Roll;
+
+  // Serialize JSON to string and send
+  String output;
+  serializeJson(doc, output);
+  sendData(output);
 }
 
-void updateBMP280(String &dataToSend) {
-  // Read and print BMP280 data
+void updateBMP280() {
+  // Read BMP280 data
   float temperature = bmp.readTemperature();
   float pressure = bmp.readPressure();
   float altitude = bmp.readAltitude(1013.25); // Assumes standard sea level pressure
   
-  Serial.print("Temperature = ");
-  Serial.print(temperature);
-  Serial.println(" degrees Celsius");
+  // Create JSON object
+  StaticJsonDocument<256> doc;
+  doc["temperature"] = temperature;
+  doc["pressure"] = pressure;
+  doc["altitude"] = altitude;
 
-  Serial.print("Pressure = ");
-  Serial.print(pressure);
-  Serial.println(" Pa");
-
-  Serial.print("Altitude = ");
-  Serial.print(altitude);
-  Serial.println(" m");
-
-  // Append data to string for HC-12 transmission
-  dataToSend += "Temperature: " + String(temperature) + " Pressure: " + String(pressure) + " Altitude: " + String(altitude) + " ";
+  // Serialize JSON to string and send
+  String output;
+  serializeJson(doc, output);
+  sendData(output);
 }
 
-void displayGPSInfo(String &dataToSend) {
-  Serial.print(F("Location: ")); 
+void displayGPSInfo() {
+  StaticJsonDocument<256> doc;
+
+  // Add location data
   if (gps.location.isValid()) {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
-    dataToSend += "Location: " + String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6) + " ";
+    doc["location"] = String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6);
   } else {
-    Serial.print(F("INVALID"));
-    dataToSend += "Location: INVALID ";
+    doc["location"] = "INVALID";
   }
 
-  Serial.print(F("  Date/Time: "));
+  // Add date data
   if (gps.date.isValid()) {
-    Serial.print(gps.date.month());
-    Serial.print(F("/"));
-    Serial.print(gps.date.day());
-    Serial.print(F("/"));
-    Serial.print(gps.date.year());
-    dataToSend += "Date: " + String(gps.date.month()) + "/" + String(gps.date.day()) + "/" + String(gps.date.year()) + " ";
+    doc["date"] = String(gps.date.month()) + "/" + String(gps.date.day()) + "/" + String(gps.date.year());
   } else {
-    Serial.print(F("INVALID"));
-    dataToSend += "Date: INVALID ";
+    doc["date"] = "INVALID";
   }
 
-  Serial.print(F(" "));
+  // Add time data
   if (gps.time.isValid()) {
-    if (gps.time.hour() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.hour());
-    Serial.print(F(":"));
-    if (gps.time.minute() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.minute());
-    Serial.print(F(":"));
-    if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
-    if (gps.time.centisecond() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.centisecond());
-    dataToSend += "Time: " + String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second()) + "." + String(gps.time.centisecond()) + " ";
+    doc["time"] = String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second()) + "." + String(gps.time.centisecond());
   } else {
-    Serial.print(F("INVALID"));
-    dataToSend += "Time: INVALID ";
+    doc["time"] = "INVALID";
   }
 
-  Serial.println();
+  // Serialize JSON to string and send
+  String output;
+  serializeJson(doc, output);
+  sendData(output);
 }
 
-void sendDataViaHC12(const String &data) {
+void sendData(const String &data) {
+  Serial.println(data); // Print to Serial Monitor
   hc12Serial.println(data); // Send the data string via HC-12
 }
