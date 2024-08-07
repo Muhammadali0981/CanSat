@@ -1,17 +1,16 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect
-from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve
+import sys
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect, QApplication
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
 import pyqtgraph as pg
-from starry_background import StarryBackground
+import serial
+import json
+from datetime import datetime, timedelta
 
 class ArduinoGUI(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
-        self.setStyleSheet("color: yellow;")
-
-        # Create and set the starry background
-        self.starry_background = StarryBackground(self)
-        self.starry_background.setGeometry(self.rect())
+        self.setStyleSheet("color: yellow; background-color: black;")
 
         self.layout = QVBoxLayout(self)
 
@@ -41,12 +40,21 @@ class ArduinoGUI(QWidget):
         data_layout = QVBoxLayout(data_widget)
         data_layout.setAlignment(Qt.AlignTop)
 
-        self.data_labels = {}
-        for data_type in ['Temperature', 'Humidity', 'Longitude', 'Latitude', 'Yaw', 'Pitch', 'Roll']:
-            label = QLabel(f"{data_type}: N/A")
+        self.data_labels = {
+            "yaw": QLabel("Yaw: N/A"),
+            "pitch": QLabel("Pitch: N/A"),
+            "roll": QLabel("Roll: N/A"),
+            "temperature": QLabel("Temperature: N/A"),
+            "pressure": QLabel("Pressure: N/A"),
+            "altitude": QLabel("Altitude: N/A"),
+            "location": QLabel("Location: Signal not available"),
+            "date_time_gmt": QLabel("Date/Time (GMT): Signal not available"),
+            "date_time_pkt": QLabel("Date/Time (PKT): Signal not available")
+        }
+
+        for label in self.data_labels.values():
             label.setStyleSheet("font-size: 24px; margin: 10px;")
             data_layout.addWidget(label)
-            self.data_labels[data_type] = label
 
         main_content.addWidget(data_widget)
 
@@ -71,7 +79,7 @@ class ArduinoGUI(QWidget):
 
         self.layout.addLayout(main_content)
 
-        # Set up data (replace this with actual Arduino data in the future)
+        # Set up data
         self.time_data = []
         self.yaw_data = []
         self.pitch_data = []
@@ -82,22 +90,65 @@ class ArduinoGUI(QWidget):
         self.setGraphicsEffect(self.opacity_effect)
         self.opacity_effect.setOpacity(0)
 
-    def update_data(self, data):
-        # This method should be called when new data is received from Arduino
-        for key, value in data.items():
-            if key in self.data_labels:
-                self.data_labels[key].setText(f"{key}: {value}")
+        # Set up serial connection
+        try:
+            self.serial_port = serial.Serial('COM3', 9600)  # Replace 'COM3' with your actual port
+        except serial.SerialException as e:
+            print(f"Serial port error: {e}")
+            sys.exit(1)
 
-        # Update graph data
-        self.time_data.append(len(self.time_data))
-        self.yaw_data.append(data.get('Yaw', 0))
-        self.pitch_data.append(data.get('Pitch', 0))
-        self.roll_data.append(data.get('Roll', 0))
+        self.buffer = ""
+        self.previous_values = {key: "N/A" for key in self.data_labels.keys()}
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.read_serial_data)
+        self.timer.start(100)  # Check for new data every 100ms
 
-        # Update graph
-        self.yaw_curve.setData(self.time_data, self.yaw_data)
-        self.pitch_curve.setData(self.time_data, self.pitch_data)
-        self.roll_curve.setData(self.time_data, self.roll_data)
+    def read_serial_data(self):
+        try:
+            if self.serial_port.in_waiting > 0:
+                self.buffer += self.serial_port.read(self.serial_port.in_waiting).decode('utf-8')
+                lines = self.buffer.split('\n')
+                for line in lines:
+                    if line.strip():
+                        print(f"Raw data received: {line.strip()}")  # Print raw data for debugging
+                        self.parse_data(line.strip())
+                self.buffer = ""
+        except Exception as e:
+            print(f"Error reading serial data: {e}")
+
+    def parse_data(self, data):
+        try:
+            print(f"Parsing data: {data}")  # Print data being parsed for debugging
+            json_data = json.loads(data)
+
+            for key in ["yaw", "pitch", "roll", "temperature", "pressure", "altitude", "location"]:
+                if key in json_data:
+                    self.previous_values[key] = json_data[key]
+                    self.data_labels[key].setText(f"{key.capitalize()}: {self.previous_values[key]}")
+
+            if "date" in json_data and "time" in json_data:
+                gmt_time = datetime.strptime(f"{json_data['date']} {json_data['time']}", "%m/%d/%Y %H:%M:%S.%f")
+                pkt_time = gmt_time + timedelta(hours=5)
+                self.previous_values["date_time_gmt"] = gmt_time.strftime("%m/%d/%Y %H:%M:%S.%f")
+                self.previous_values["date_time_pkt"] = pkt_time.strftime("%m/%d/%Y %H:%M:%S.%f")
+
+                self.data_labels["date_time_gmt"].setText(f"Date/Time (GMT): {self.previous_values['date_time_gmt']}")
+                self.data_labels["date_time_pkt"].setText(f"Date/Time (PKT): {self.previous_values['date_time_pkt']}")
+
+            # Update graph
+            self.time_data.append(len(self.time_data))
+            self.yaw_data.append(float(self.previous_values["yaw"]))
+            self.pitch_data.append(float(self.previous_values["pitch"]))
+            self.roll_data.append(float(self.previous_values["roll"]))
+
+            self.yaw_curve.setData(self.time_data, self.yaw_data)
+            self.pitch_curve.setData(self.time_data, self.pitch_data)
+            self.roll_curve.setData(self.time_data, self.roll_data)
+
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
+        except Exception as e:
+            print(f"Error parsing data: {e}")
 
     def fade_in(self):
         self.animation = QPropertyAnimation(self.opacity_effect, b"opacity")
@@ -110,6 +161,9 @@ class ArduinoGUI(QWidget):
     def go_back_to_menu(self):
         self.main_window.show_main_menu()
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.starry_background.setGeometry(self.rect())
+# For testing purposes
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = ArduinoGUI(None)
+    window.show()
+    sys.exit(app.exec_())

@@ -16,7 +16,7 @@ class StarryBackground(QWidget):
         self.stars = []
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_stars)
-        self.timer.start(50)  # Update every 50 ms
+        self.timer.start(500)  # Update every 50 ms
 
     def create_stars(self):
         num_stars = int(self.width() * self.height() / 1000)  # Adjust for desired star density

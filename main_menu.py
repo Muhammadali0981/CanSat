@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QGraphicsOpacityEffect, QLabel, QStackedWidget
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QTimer, QEasingCurve
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QPalette, QBrush
 from starry_background import StarryBackground
 from arduino_gui import ArduinoGUI
 
@@ -55,6 +55,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CanSat Space Mission")
+        self.setStyleSheet("color: yellow; background-color: black;")
+
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -63,8 +65,11 @@ class MainWindow(QMainWindow):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create and set the starry background
-        self.starry_background = StarryBackground(self)
-        self.starry_background.setGeometry(self.rect())
+        # self.starry_background = StarryBackground(self.central_widget)
+        # palette = self.central_widget.palette()
+        # palette.setBrush(QPalette.Window, QBrush(self.starry_background.grab()))
+        # self.central_widget.setAutoFillBackground(True)
+        # self.central_widget.setPalette(palette)
 
         self.stacked_widget = QStackedWidget()
         self.main_layout.addWidget(self.stacked_widget)
@@ -107,7 +112,10 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.starry_background.setGeometry(self.rect())
+        self.starry_background.setGeometry(self.central_widget.rect())
+        palette = self.central_widget.palette()
+        palette.setBrush(QPalette.Window, QBrush(self.starry_background.grab()))
+        self.central_widget.setPalette(palette)
 
     def start_application(self):
         self.start_button.animate_out(QRect(self.width() // 2 - 150, -100, 300, 100))
