@@ -10,7 +10,7 @@ MPU6050 mpu(Wire);
 Adafruit_BMP280 bmp; // I2C
 
 // GPS settings
-static const int GPS_RXPin = 3, GPS_TXPin = 4;
+static const int GPS_RXPin = 4, GPS_TXPin = 3;
 static const uint32_t GPSBaud = 9600;
 
 // HC-12 settings
@@ -51,6 +51,7 @@ void setup() {
 
   // Initialize GPS
   gpsSerial.begin(GPSBaud);
+  delay(1000);  // Give the GPS module time to start up
   Serial.println(F("GPS module initialized."));
 
   // Initialize HC-12
@@ -59,16 +60,17 @@ void setup() {
 }
 
 void loop() {
-  // Process GPS data continuously
+  // Process GPS data
   while (gpsSerial.available() > 0) {
-    gps.encode(gpsSerial.read());
+    char c = gpsSerial.read();
+    gps.encode(c);
   }
 
-  // Update MPU6050 and BMP280 data every second
-  if ((millis() - timer) > 1000) { // print data every 1000ms (1 second)
+  // Update data every second
+  if ((millis() - timer) > 1000) {
     updateMPU6050();
     updateBMP280();
-    displayGPSInfo();
+    displayGPSInfo();  // Ensure GPS data is sent regularly
 
     // Update timer
     timer = millis();
@@ -132,7 +134,9 @@ void displayGPSInfo() {
 
   // Add time data
   if (gps.time.isValid()) {
-    doc["time"] = String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second()) + "." + String(gps.time.centisecond());
+    char timeBuffer[10];
+    sprintf(timeBuffer, "%02d:%02d:%02d", gps.time.hour(), gps.time.minute(), gps.time.second());
+    doc["time"] = timeBuffer;
   } else {
     doc["time"] = "INVALID";
   }

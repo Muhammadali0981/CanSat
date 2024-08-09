@@ -1,15 +1,17 @@
 import sys
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect, QApplication
 from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt5.QtGui import QColor
 import pyqtgraph as pg
 import serial
 import json
 from datetime import datetime, timedelta
 
 class ArduinoGUI(QWidget):
-    def __init__(self, main_window):
+    def __init__(self, main_window, settings):
         super().__init__()
         self.main_window = main_window
+        self.settings = settings
         self.setStyleSheet("color: yellow; background-color: black;")
 
         self.layout = QVBoxLayout(self)
@@ -75,8 +77,27 @@ class ArduinoGUI(QWidget):
         self.roll_curve = self.graph.plot(pen='b', name='Roll')
 
         graph_layout.addWidget(self.graph)
-        main_content.addWidget(graph_widget)
 
+        # Refresh button
+        self.refresh_button = QPushButton("Refresh Graph")
+        self.refresh_button.setStyleSheet("""
+            QPushButton {
+                background-color: yellow;
+                color: black;
+                border: 2px solid yellow;
+                border-radius: 10px;
+                padding: 5px;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: black;
+                color: yellow;
+            }
+        """)
+        self.refresh_button.clicked.connect(self.refresh_graph)
+        graph_layout.addWidget(self.refresh_button, alignment=Qt.AlignCenter)
+
+        main_content.addWidget(graph_widget)
         self.layout.addLayout(main_content)
 
         # Set up data
@@ -91,17 +112,27 @@ class ArduinoGUI(QWidget):
         self.opacity_effect.setOpacity(0)
 
         # Set up serial connection
-        try:
-            self.serial_port = serial.Serial('COM3', 9600)  # Replace 'COM3' with your actual port
-        except serial.SerialException as e:
-            print(f"Serial port error: {e}")
-            sys.exit(1)
+        self.setup_serial_connection()
 
         self.buffer = ""
         self.previous_values = {key: "N/A" for key in self.data_labels.keys()}
         self.timer = QTimer()
         self.timer.timeout.connect(self.read_serial_data)
         self.timer.start(100)  # Check for new data every 100ms
+
+    def setup_serial_connection(self):
+        try:
+            self.serial_port = serial.Serial(self.settings["com_port"], self.settings["baud_rate"])
+            print(f"Connected to {self.settings['com_port']} at {self.settings['baud_rate']} baud")
+        except serial.SerialException as e:
+            print(f"Serial port error: {e}")
+            # You might want to show an error message to the user here
+
+    def update_settings(self, new_settings):
+        self.settings = new_settings
+        if hasattr(self, 'serial_port'):
+            self.serial_port.close()
+        self.setup_serial_connection()
 
     def read_serial_data(self):
         try:
@@ -150,6 +181,17 @@ class ArduinoGUI(QWidget):
         except Exception as e:
             print(f"Error parsing data: {e}")
 
+    def refresh_graph(self):
+        # Clear the existing data and reset the graph
+        self.time_data.clear()
+        self.yaw_data.clear()
+        self.pitch_data.clear()
+        self.roll_data.clear()
+        self.yaw_curve.clear()
+        self.pitch_curve.clear()
+        self.roll_curve.clear()
+        print("Graph refreshed")
+
     def fade_in(self):
         self.animation = QPropertyAnimation(self.opacity_effect, b"opacity")
         self.animation.setDuration(1000)
@@ -164,6 +206,6 @@ class ArduinoGUI(QWidget):
 # For testing purposes
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = ArduinoGUI(None)
+    window = ArduinoGUI(None, {"com_port": "COM1", "baud_rate": 9600})
     window.show()
     sys.exit(app.exec_())
