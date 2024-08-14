@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         credits_layout.setAlignment(Qt.AlignRight | Qt.AlignBottom)
 
         # Add credits label to the layout
-        self.credits_label = QLabel("Created by Shaheer M Shahbaz and M Ali")
+        self.credits_label = QLabel("Created by Shaheer Muhammad Shahbaz and Muhammad Ali")
         self.credits_label.setStyleSheet("color: yellow; font-size: 14px;")
         credits_layout.addWidget(self.credits_label)
         
