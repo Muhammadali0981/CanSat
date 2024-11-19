@@ -6,9 +6,9 @@ NOTE: PYTHON MUST BE INSTALLED AND CHECK ARDUINO CODE TO INSTALL ALL THE LIBRARI
 
 Libaries used:
 Backend:
-- Arduiuno libraries
+-Arduiuno libraries
 Frontend:
-- Pyqt
+-Pyqt
 
 By:
 Shaheer Muhammad Shahbaz And Muhammad Ali
