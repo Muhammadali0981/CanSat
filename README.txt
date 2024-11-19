@@ -4,6 +4,11 @@
 
 NOTE: PYTHON MUST BE INSTALLED AND CHECK ARDUINO CODE TO INSTALL ALL THE LIBRARIES
 
+Libaries used:
+Backend:
+- Arduiuno libraries
+Frontend:
+- Pyqt
 
 By:
 Shaheer Muhammad Shahbaz And Muhammad Ali
